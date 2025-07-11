@@ -1,0 +1,14 @@
+data/ 
+data_combined/ 
+outputs/ 
+models/ 
+__pycache__/ 
+*.pyc 
+*.pkl 
+*.h5 
+*.csv 
+*.zip 
+*.tar.gz 
+.vscode/ 
+.idea/ 
+.DS_Store 
