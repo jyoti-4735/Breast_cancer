@@ -4,7 +4,7 @@ pandas
 numpy
 scikit-learn
 matplotlib
-opencv-python
 torch
 torchvision
 torchaudio
+opencv-python-headless
