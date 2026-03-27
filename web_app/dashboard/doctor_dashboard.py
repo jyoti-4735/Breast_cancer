@@ -1,8 +1,7 @@
 import streamlit as st
-import mysql.connector
-from mysql.connector import Error
-from utils.database import DB_CONFIG
+from utils.database import connect_to_db
 from utils.session import is_authenticated
+
 
 def doctor_dashboard():
     st.title("👨‍⚕ Doctor Dashboard")
@@ -18,10 +17,10 @@ def doctor_dashboard():
     st.success(f"🔐 Logged in as: {doctor_email}")
 
     try:
-        conn = mysql.connector.connect(**DB_CONFIG)
+        conn = connect_to_db()
         cursor = conn.cursor()
 
-        # Registered Patients Section
+        # 🔹 Registered Patients
         st.subheader("📋 Registered Patients")
         cursor.execute("SELECT name, email, phone FROM patients")
         patients = cursor.fetchall()
@@ -29,36 +28,45 @@ def doctor_dashboard():
         if patients:
             patient_data = []
             for idx, (name, email, phone) in enumerate(patients, 1):
-                patient_data.append({"#": idx, "Name": name, "Email": email, "Phone": phone})
+                patient_data.append({
+                    "#": idx,
+                    "Name": name,
+                    "Email": email,
+                    "Phone": phone
+                })
             st.table(patient_data)
         else:
             st.info("No patients registered.")
 
-        # Appointment Requests Section
+        # 🔹 Appointment Requests
         st.subheader("📅 Appointment Requests")
+
         cursor.execute("""
             SELECT a.id, p.name, a.date, a.time, a.status
             FROM appointments a
             JOIN patients p ON a.patient_email = p.email
-            WHERE a.doctor_email = %s
+            WHERE a.doctor_email = ?
             ORDER BY a.date DESC, a.time DESC
         """, (doctor_email,))
+
         appointments = cursor.fetchall()
 
         if appointments:
             for appt_id, patient_name, appt_date, appt_time, status in appointments:
                 with st.container():
                     col1, col2, col3 = st.columns([3, 2, 2])
+
                     with col1:
                         st.markdown(f"""
                         <div style='font-size:18px;'><b>{patient_name}</b></div>
                         <div>📅 {appt_date} ⏰ {appt_time}</div>
                         """, unsafe_allow_html=True)
+
                     with col2:
                         status_color = {
-                            "pending": "#FFA500",  # Orange
-                            "accepted": "#4CAF50", # Green
-                            "rejected": "#F44336"  # Red
+                            "pending": "#FFA500",
+                            "accepted": "#4CAF50",
+                            "rejected": "#F44336"
                         }.get(status.lower(), "gray")
 
                         st.markdown(f"""
@@ -66,29 +74,40 @@ def doctor_dashboard():
                         {status.capitalize()}
                         </span>
                         """, unsafe_allow_html=True)
+
                     with col3:
                         if status.lower() == "pending":
                             if st.button("✅ Accept", key=f"accept_{appt_id}"):
                                 update_status(appt_id, "accepted")
-                                st.experimental_rerun()
+                                st.rerun()
+
                             if st.button("❌ Reject", key=f"reject_{appt_id}"):
                                 update_status(appt_id, "rejected")
-                                st.experimental_rerun()
+                                st.rerun()
+
                 st.markdown("<hr>", unsafe_allow_html=True)
         else:
             st.info("No appointment requests found.")
 
         conn.close()
 
-    except Error as e:
+    except Exception as e:
         st.error(f"Database error: {e}")
 
+
+# 🔹 Update appointment status
 def update_status(appointment_id, new_status):
     try:
-        conn = mysql.connector.connect(**DB_CONFIG)
+        conn = connect_to_db()
         cursor = conn.cursor()
-        cursor.execute("UPDATE appointments SET status = %s WHERE id = %s", (new_status, appointment_id))
+
+        cursor.execute(
+            "UPDATE appointments SET status = ? WHERE id = ?",
+            (new_status, appointment_id)
+        )
+
         conn.commit()
         conn.close()
-    except Error as e:
+
+    except Exception as e:
         st.error(f"Failed to update appointment status: {e}")
